@@ -170,6 +170,7 @@ struct Simulator<'a> {
     review_queue: BinaryHeap<(Reverse<u32>, SubjectID)>,
     cur_level: u8,
     cur_level_subjects: Vec<SubjectID>,
+    cur_level_kanji: Vec<SubjectID>,
 }
 
 impl<'a> Simulator<'a> {
@@ -217,6 +218,11 @@ impl<'a> Simulator<'a> {
             .expect("No unlocked subjects");
 
         let cur_level_subjects = subjects_with_level(subjects, cur_level);
+        let cur_level_kanji = cur_level_subjects
+            .iter()
+            .copied()
+            .filter(|subject_id| subjects[subject_id].kind == SubjectKind::Kanji)
+            .collect();
 
         Self {
             review_prob,
@@ -226,6 +232,7 @@ impl<'a> Simulator<'a> {
             review_queue,
             cur_level,
             cur_level_subjects,
+            cur_level_kanji,
         }
     }
 
@@ -302,6 +309,12 @@ impl<'a> Simulator<'a> {
             if self.cur_level < MAX_LEVEL && self.passed_current_level() {
                 self.cur_level += 1;
                 self.cur_level_subjects = subjects_with_level(self.subjects, self.cur_level);
+                self.cur_level_kanji = self
+                    .cur_level_subjects
+                    .iter()
+                    .copied()
+                    .filter(|subject_id| self.subjects[subject_id].kind == SubjectKind::Kanji)
+                    .collect();
 
                 // Check if we unlocked stuff
                 for subject_id in &self.cur_level_subjects {
@@ -324,18 +337,12 @@ impl<'a> Simulator<'a> {
     }
 
     fn passed_current_level(&self) -> bool {
-        let mut num_kanji = 0;
+        let num_kanji = self.cur_level_kanji.len();
         let mut num_passed_kanji = 0;
-        for subject_id in &self.cur_level_subjects {
-            let subject = &self.subjects[subject_id];
-
-            if subject.kind == SubjectKind::Kanji {
-                num_kanji += 1;
-
-                if let Some(subject_state) = self.subject_states.get(subject_id) {
-                    if subject_state.stage.is_passing() {
-                        num_passed_kanji += 1;
-                    }
+        for subject_id in &self.cur_level_kanji {
+            if let Some(subject_state) = self.subject_states.get(subject_id) {
+                if subject_state.stage.is_passing() {
+                    num_passed_kanji += 1;
                 }
             }
         }
