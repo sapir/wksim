@@ -2,6 +2,7 @@ mod database;
 mod model;
 
 use chrono::{Duration, DurationRound};
+use indicatif::ProgressBar;
 use model::{SubjectKind, MAX_LEVEL};
 use rand::{thread_rng, Rng};
 use std::{
@@ -383,7 +384,10 @@ fn main() {
     let num_runs = 1000;
     let mut day_counts = [0; 365];
     let mut levels = [0; 365];
+    let pb = ProgressBar::new(num_runs);
     for _run in 0..num_runs {
+        pb.inc(1);
+
         let mut sim = sim.clone();
 
         for (day_count, level) in day_counts.iter_mut().zip(levels.iter_mut()) {
@@ -392,6 +396,8 @@ fn main() {
             *day_count += (0..24).map(|_| sim.step()).sum::<u32>();
         }
     }
+
+    pb.finish_with_message("done");
 
     for (day, (day_count_sum, level_sum)) in day_counts
         .iter()
