@@ -5,7 +5,8 @@ use chrono::{Duration, DurationRound};
 use model::{SubjectKind, MAX_LEVEL};
 use rand::{thread_rng, Rng};
 use std::{
-    collections::HashMap,
+    cmp::Reverse,
+    collections::{BinaryHeap, HashMap},
     convert::{TryFrom, TryInto},
 };
 
@@ -158,15 +159,6 @@ impl SubjectState {
             next_review_time: Some(cur_time),
         }
     }
-
-    pub fn is_available(&self, cur_time: u32) -> bool {
-        if let Some(next_review_time) = self.next_review_time {
-            next_review_time <= cur_time
-        } else {
-            // burned
-            false
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -175,6 +167,7 @@ struct Simulator<'a> {
     subjects: &'a HashMap<SubjectID, Subject>,
     cur_step: u32,
     subject_states: HashMap<SubjectID, SubjectState>,
+    review_queue: BinaryHeap<(Reverse<u32>, SubjectID)>,
     cur_level: u8,
     cur_level_subjects: Vec<SubjectID>,
 }
@@ -210,6 +203,11 @@ impl<'a> Simulator<'a> {
             })
             .collect::<HashMap<_, _>>();
 
+        let review_queue = subject_states
+            .iter()
+            .filter_map(|(subject_id, state)| Some((Reverse(state.next_review_time?), *subject_id)))
+            .collect();
+
         // The current level is the highest level for an unlocked subject, and
         // unlocked subjects are those included in subject_states.
         let cur_level = subject_states
@@ -225,8 +223,28 @@ impl<'a> Simulator<'a> {
             subjects,
             cur_step: 0,
             subject_states,
+            review_queue,
             cur_level,
             cur_level_subjects,
+        }
+    }
+
+    fn peek_available_review(&self) -> Option<SubjectID> {
+        let (Reverse(next_review_time), subject_id) = self.review_queue.peek()?;
+
+        if *next_review_time <= self.cur_step {
+            Some(*subject_id)
+        } else {
+            None
+        }
+    }
+
+    fn pop_available_review(&mut self) -> Option<SubjectID> {
+        if let Some(subject_id) = self.peek_available_review() {
+            self.review_queue.pop().unwrap();
+            Some(subject_id)
+        } else {
+            None
         }
     }
 
@@ -234,17 +252,10 @@ impl<'a> Simulator<'a> {
     fn step(&mut self) -> u32 {
         let mut review_count = 0;
 
-        let mut available = self
-            .subject_states
-            .iter()
-            .filter(|(_, subject)| subject.is_available(self.cur_step))
-            .map(|(subject_id, _)| *subject_id)
-            .collect::<Vec<_>>();
-
         // Loop until done unlocking levels
-        while !available.is_empty() {
+        while self.peek_available_review().is_some() {
             // Loop over subjects up to current level
-            while let Some(subject_id) = available.pop() {
+            while let Some(subject_id) = self.pop_available_review() {
                 let subject = &self.subjects[&subject_id];
                 let subject_state = self.subject_states.get_mut(&subject_id).unwrap();
 
@@ -254,11 +265,16 @@ impl<'a> Simulator<'a> {
 
                 subject_state.stage = new_stage;
                 if let Some(hours_to_next_review) = subject.srs.hours_to_next_review(new_stage) {
-                    subject_state.next_review_time = Some(self.cur_step + hours_to_next_review);
+                    // Reschedule
+                    let next_review_time = self.cur_step + hours_to_next_review;
+                    subject_state.next_review_time = Some(next_review_time);
+                    self.review_queue
+                        .push((Reverse(next_review_time), subject_id));
                 } else {
                     // Burned!
                     debug_assert_eq!(new_stage, Stage::Burned);
                     subject_state.next_review_time = None;
+                    // No need to reschedule in review_queue
                 }
 
                 if !old_stage.is_passing() && new_stage.is_passing() {
@@ -274,9 +290,9 @@ impl<'a> Simulator<'a> {
                         if self.may_unlock(subject2_id) {
                             self.subject_states
                                 .insert(subject2_id, SubjectState::newly_unlocked(self.cur_step));
-
                             // Prepare to do review immediately
-                            available.push(subject2_id);
+                            self.review_queue
+                                .push((Reverse(self.cur_step), subject2_id));
                         }
                     }
                 }
@@ -296,7 +312,7 @@ impl<'a> Simulator<'a> {
                             .insert(subject_id, SubjectState::newly_unlocked(self.cur_step));
 
                         // Prepare to do review immediately
-                        available.push(subject_id);
+                        self.review_queue.push((Reverse(self.cur_step), subject_id));
                     }
                 }
             }
