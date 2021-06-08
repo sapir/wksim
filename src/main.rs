@@ -380,7 +380,7 @@ fn main() {
 
     let sim = Simulator::new(&review_prob, &subjects, &mut db);
 
-    let num_runs = 10;
+    let num_runs = 1000;
     let mut day_counts = [0; 365];
     let mut levels = [0; 365];
     for _run in 0..num_runs {
