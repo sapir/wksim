@@ -138,10 +138,17 @@ impl<'a> DatabaseWrapper<'a> {
                 let subject_id = Self::json_to_subject_id(&json["subject_id"]);
                 let stage = Self::json_to_stage(&json["srs_stage"]);
 
-                let next_review_time = json["available_at"].as_str().unwrap();
-                let next_review_time = DateTime::parse_from_rfc3339(next_review_time)
-                    .unwrap()
-                    .into();
+                let next_review_time = &json["available_at"];
+                let next_review_time = if next_review_time.is_null() {
+                    None
+                } else {
+                    let next_review_time = next_review_time.as_str().unwrap();
+                    Some(
+                        DateTime::parse_from_rfc3339(next_review_time)
+                            .unwrap()
+                            .into(),
+                    )
+                };
 
                 Ok(Assignment {
                     subject_id,

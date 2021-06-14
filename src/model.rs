@@ -107,5 +107,5 @@ pub struct Subject {
 pub struct Assignment {
     pub subject_id: SubjectID,
     pub stage: Stage,
-    pub next_review_time: DateTime<Local>,
+    pub next_review_time: Option<DateTime<Local>>,
 }

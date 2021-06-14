@@ -192,13 +192,23 @@ impl<'a> Simulator<'a> {
             .map(|assignment| {
                 let assignment = assignment.unwrap();
 
-                let time_since = assignment.next_review_time.signed_duration_since(base_time);
-                let steps_from_base = time_since.num_hours().max(0).try_into().unwrap();
+                let mut stage = assignment.stage;
+
+                let steps_from_base = if let Some(next_review_time) = assignment.next_review_time {
+                    assert_ne!(stage, Stage::Initiate);
+                    let time_since = next_review_time.signed_duration_since(base_time);
+                    time_since.num_hours().max(0).try_into().unwrap()
+                } else {
+                    assert_eq!(stage, Stage::Initiate);
+                    // Pretend we did the lesson, skip initiate stage.
+                    stage = Stage::Apprentice1;
+                    0
+                };
 
                 (
                     assignment.subject_id,
                     SubjectState {
-                        stage: assignment.stage,
+                        stage,
                         next_review_time: Some(steps_from_base),
                     },
                 )
