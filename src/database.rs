@@ -93,12 +93,7 @@ impl<'a> DatabaseWrapper<'a> {
             .query_map([], |row| {
                 let id = SubjectID(row.get::<_, i64>(0)?.try_into().unwrap());
 
-                let object = row
-                    .get_ref(1)?
-                    .as_str()
-                    .unwrap()
-                    .try_into()
-                    .unwrap();
+                let object = row.get_ref(1)?.as_str().unwrap().try_into().unwrap();
 
                 // TODO: don't set up a full serde_json::Value, avoid copying
                 let json: serde_json::Value = row.get(2)?;

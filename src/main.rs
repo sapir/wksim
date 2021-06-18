@@ -409,6 +409,34 @@ impl AverageByDay {
     }
 }
 
+struct StageCountAverage {
+    stages: Vec<AverageByDay>,
+}
+
+impl StageCountAverage {
+    pub fn new(num_days: usize) -> Self {
+        let mut stages = Vec::with_capacity(NUM_STAGES);
+        stages.resize_with(NUM_STAGES, || AverageByDay::new(num_days));
+        Self { stages }
+    }
+
+    pub fn add_card_stage(&mut self, day: usize, stage: Stage) {
+        self.stages[stage as usize].add(day, 1);
+    }
+
+    pub fn average_for_stage_range(
+        &self,
+        num_values: u32,
+        day: usize,
+        start_stage: Stage,
+        end_stage: Stage,
+    ) -> u32 {
+        (start_stage as usize..=end_stage as usize)
+            .map(|stage| self.stages[stage].average(num_values, day))
+            .sum()
+    }
+}
+
 #[derive(StructOpt)]
 #[structopt(name = "wksim", about = "Wanikani review simulator")]
 struct Opt {
@@ -432,6 +460,8 @@ fn main() {
 
     let mut reviews = AverageByDay::new(opt.num_days);
     let mut levels = AverageByDay::new(opt.num_days);
+    let mut deck_stage_counts = StageCountAverage::new(opt.num_days);
+
     let pb = ProgressBar::new(opt.num_runs.into());
     for _run in 0..opt.num_runs {
         pb.inc(1);
@@ -440,6 +470,10 @@ fn main() {
 
         for day in 0..opt.num_days {
             levels.add(day, sim.cur_level.into());
+            for subj_state in sim.subject_states.values() {
+                deck_stage_counts.add_card_stage(day, subj_state.stage);
+            }
+
             let day_reviews = (0..24).map(|_| sim.step()).sum::<u32>();
             reviews.add(day, day_reviews);
         }
@@ -449,10 +483,40 @@ fn main() {
 
     for day in 0..opt.num_days {
         println!(
-            "Day {:>3}: level {:>2}, {:>4} reviews",
+            "Day {:>3}: level {:>2}, {:>4} reviews  A: {:>4}  G: {:>4}  M: {:>4}  E: {:>4}  B: {:>4}",
             day,
             levels.average(opt.num_runs, day),
             reviews.average(opt.num_runs, day),
+            deck_stage_counts.average_for_stage_range(
+                opt.num_runs,
+                day,
+                Stage::Apprentice1,
+                Stage::Apprentice4
+            ),
+            deck_stage_counts.average_for_stage_range(
+                opt.num_runs,
+                day,
+                Stage::Guru1,
+                Stage::Guru2
+            ),
+            deck_stage_counts.average_for_stage_range(
+                opt.num_runs,
+                day,
+                Stage::Master,
+                Stage::Master
+            ),
+            deck_stage_counts.average_for_stage_range(
+                opt.num_runs,
+                day,
+                Stage::Enlightened,
+                Stage::Enlightened
+            ),
+            deck_stage_counts.average_for_stage_range(
+                opt.num_runs,
+                day,
+                Stage::Burned,
+                Stage::Burned
+            ),
         );
     }
 }
