@@ -191,7 +191,7 @@ impl<'a> Simulator<'a> {
             .next_review_time()
             .expect("No available reviews")
             // Round down to hour
-            .duration_trunc(Duration::hours(1))
+            .duration_trunc(Duration::days(1))
             .unwrap();
 
         let subject_states = db
