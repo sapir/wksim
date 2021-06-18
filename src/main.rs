@@ -119,6 +119,12 @@ impl ReviewResultProbability {
     }
 
     pub fn sample_for(&self, prev_stage: Stage) -> Option<Stage> {
+        if prev_stage == Stage::Initiate {
+            // Initiate reviews always go to Apprentice1 once you answer them
+            // correctly.
+            return Some(Stage::Apprentice1);
+        }
+
         self.by_prev_stage[prev_stage as usize].sample()
     }
 }
@@ -156,7 +162,7 @@ struct SubjectState {
 impl SubjectState {
     pub fn newly_unlocked(cur_time: u32) -> Self {
         Self {
-            stage: Stage::Apprentice1,
+            stage: Stage::Initiate,
             next_review_time: Some(cur_time),
         }
     }
@@ -192,7 +198,7 @@ impl<'a> Simulator<'a> {
             .map(|assignment| {
                 let assignment = assignment.unwrap();
 
-                let mut stage = assignment.stage;
+                let stage = assignment.stage;
 
                 let steps_from_base = if let Some(next_review_time) = assignment.next_review_time {
                     assert_ne!(stage, Stage::Initiate);
@@ -200,8 +206,8 @@ impl<'a> Simulator<'a> {
                     time_since.num_hours().max(0).try_into().unwrap()
                 } else {
                     assert_eq!(stage, Stage::Initiate);
-                    // Pretend we did the lesson, skip initiate stage.
-                    stage = Stage::Apprentice1;
+                    // Pretend we did the lesson, now subject is waiting for us
+                    // to review it immediately.
                     0
                 };
 
