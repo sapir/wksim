@@ -389,6 +389,26 @@ impl<'a> Simulator<'a> {
     }
 }
 
+struct AverageByDay {
+    day_values: Vec<u64>,
+}
+
+impl AverageByDay {
+    pub fn new(num_days: usize) -> Self {
+        Self {
+            day_values: vec![0; num_days],
+        }
+    }
+
+    pub fn add(&mut self, day: usize, value: u32) {
+        self.day_values[day] += u64::from(value);
+    }
+
+    pub fn average(&self, num_values: u32, day: usize) -> u32 {
+        (self.day_values[day] as f64 / f64::from(num_values)).round() as u32
+    }
+}
+
 #[derive(StructOpt)]
 #[structopt(name = "wksim", about = "Wanikani review simulator")]
 struct Opt {
@@ -410,36 +430,29 @@ fn main() {
 
     let sim = Simulator::new(&review_prob, &subjects, &mut db);
 
-    let mut day_counts = vec![0; opt.num_days];
-    let mut levels = vec![0; opt.num_days];
+    let mut reviews = AverageByDay::new(opt.num_days);
+    let mut levels = AverageByDay::new(opt.num_days);
     let pb = ProgressBar::new(opt.num_runs.into());
     for _run in 0..opt.num_runs {
         pb.inc(1);
 
         let mut sim = sim.clone();
 
-        for (day_count, level) in day_counts.iter_mut().zip(levels.iter_mut()) {
-            // Cast to u32 so that it's big enough to store the sum
-            *level += u32::from(sim.cur_level);
-            *day_count += (0..24).map(|_| sim.step()).sum::<u32>();
+        for day in 0..opt.num_days {
+            levels.add(day, sim.cur_level.into());
+            let day_reviews = (0..24).map(|_| sim.step()).sum::<u32>();
+            reviews.add(day, day_reviews);
         }
     }
 
     pb.finish_with_message("done");
 
-    for (day, (day_count_sum, level_sum)) in day_counts
-        .iter()
-        .copied()
-        .zip(levels.iter().copied())
-        .enumerate()
-    {
-        let avg_day_count = day_count_sum as f32 / opt.num_runs as f32;
-        let avg_level = level_sum as f32 / opt.num_runs as f32;
+    for day in 0..opt.num_days {
         println!(
             "Day {:>3}: level {:>2}, {:>4} reviews",
             day,
-            avg_level.round() as u32,
-            avg_day_count.round() as u32
+            levels.average(opt.num_runs, day),
+            reviews.average(opt.num_runs, day),
         );
     }
 }
