@@ -394,6 +394,9 @@ impl<'a> Simulator<'a> {
 struct Opt {
     #[structopt(short, long, default_value = "100")]
     num_runs: u32,
+
+    #[structopt(short = "d", long, default_value = "365")]
+    num_days: usize,
 }
 
 fn main() {
@@ -407,8 +410,8 @@ fn main() {
 
     let sim = Simulator::new(&review_prob, &subjects, &mut db);
 
-    let mut day_counts = [0; 365];
-    let mut levels = [0; 365];
+    let mut day_counts = vec![0; opt.num_days];
+    let mut levels = vec![0; opt.num_days];
     let pb = ProgressBar::new(opt.num_runs.into());
     for _run in 0..opt.num_runs {
         pb.inc(1);
