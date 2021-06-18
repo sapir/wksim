@@ -1,5 +1,5 @@
 use chrono::{DateTime, Local};
-use rusqlite::{Connection, OptionalExtension, Statement, NO_PARAMS};
+use rusqlite::{Connection, OptionalExtension, Statement};
 use std::convert::{TryFrom, TryInto};
 
 use crate::model::{Assignment, Review, Srs, Stage, Subject, SubjectID};
@@ -72,7 +72,7 @@ impl<'a> DatabaseWrapper<'a> {
 
     pub fn reviews(&mut self) -> impl Iterator<Item = rusqlite::Result<Review>> + '_ {
         self.select_reviews_stmt
-            .query_map(NO_PARAMS, |row| {
+            .query_map([], |row| {
                 // TODO: don't set up a full serde_json::Value, avoid copying
                 let json: serde_json::Value = row.get(0)?;
                 let srs = Self::json_to_srs(&json["spaced_repetition_system_id"]);
@@ -90,11 +90,11 @@ impl<'a> DatabaseWrapper<'a> {
 
     pub fn subjects(&mut self) -> impl Iterator<Item = rusqlite::Result<Subject>> + '_ {
         self.select_subjects_stmt
-            .query_map(NO_PARAMS, |row| {
+            .query_map([], |row| {
                 let id = SubjectID(row.get::<_, i64>(0)?.try_into().unwrap());
 
                 let object = row
-                    .get_raw_checked(1)?
+                    .get_ref(1)?
                     .as_str()
                     .unwrap()
                     .try_into()
@@ -132,7 +132,7 @@ impl<'a> DatabaseWrapper<'a> {
 
     pub fn assignments(&mut self) -> impl Iterator<Item = rusqlite::Result<Assignment>> + '_ {
         self.select_assignments_stmt
-            .query_map(NO_PARAMS, |row| {
+            .query_map([], |row| {
                 // TODO: don't set up a full serde_json::Value, avoid copying
                 let json: serde_json::Value = row.get(0)?;
                 let subject_id = Self::json_to_subject_id(&json["subject_id"]);
@@ -161,8 +161,8 @@ impl<'a> DatabaseWrapper<'a> {
 
     pub fn next_review_time(&mut self) -> Option<DateTime<Local>> {
         self.select_next_review_time_stmt
-            .query_row(NO_PARAMS, |row| {
-                let time = row.get_raw_checked(0)?.as_str().unwrap();
+            .query_row([], |row| {
+                let time = row.get_ref(0)?.as_str().unwrap();
                 Ok(DateTime::parse_from_rfc3339(time).unwrap().into())
             })
             .optional()
