@@ -15,6 +15,7 @@ num_enum = "0.5.1"
 rand = "0.8.3"
 chrono = "0.4.19"
 indicatif = "0.16.2"
+structopt = "0.3.21"
 
 [profile.release]
 debug = true

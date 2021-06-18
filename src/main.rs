@@ -10,6 +10,7 @@ use std::{
     collections::{BinaryHeap, HashMap},
     convert::{TryFrom, TryInto},
 };
+use structopt::StructOpt;
 
 use self::{
     database::DatabaseWrapper,
@@ -388,7 +389,16 @@ impl<'a> Simulator<'a> {
     }
 }
 
+#[derive(StructOpt)]
+#[structopt(name = "wksim", about = "Wanikani review simulator")]
+struct Opt {
+    #[structopt(short, long, default_value = "100")]
+    num_runs: u32,
+}
+
 fn main() {
+    let opt = Opt::from_args();
+
     let db = database::open().unwrap();
     let mut db = DatabaseWrapper::new(&db);
 
@@ -397,11 +407,10 @@ fn main() {
 
     let sim = Simulator::new(&review_prob, &subjects, &mut db);
 
-    let num_runs = 1000;
     let mut day_counts = [0; 365];
     let mut levels = [0; 365];
-    let pb = ProgressBar::new(num_runs);
-    for _run in 0..num_runs {
+    let pb = ProgressBar::new(opt.num_runs.into());
+    for _run in 0..opt.num_runs {
         pb.inc(1);
 
         let mut sim = sim.clone();
@@ -421,8 +430,8 @@ fn main() {
         .zip(levels.iter().copied())
         .enumerate()
     {
-        let avg_day_count = day_count_sum as f32 / num_runs as f32;
-        let avg_level = level_sum as f32 / num_runs as f32;
+        let avg_day_count = day_count_sum as f32 / opt.num_runs as f32;
+        let avg_level = level_sum as f32 / opt.num_runs as f32;
         println!(
             "Day {:>3}: level {:>2}, {:>4} reviews",
             day,
